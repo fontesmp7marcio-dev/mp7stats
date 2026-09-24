@@ -1,0 +1,6 @@
+{
+  "name": "Mp7Stats",
+  "description": "An interactive full-stack web crawler and mathematical backtest analyzer. It sweeps scheduled matches, analyzes 29+ markets across the last 10 matches, and exports optimized betting propositions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
