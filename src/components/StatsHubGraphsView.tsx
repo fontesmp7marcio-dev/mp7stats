@@ -5,6 +5,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { MatchData, MarketType, RealTeamHistoricalMatch, isAuthenticHistory } from "../types";
+import { isNationalTeamContext } from "../data";
 import { Plus, Minus, Info, CheckCircle, BarChart3, Globe } from "lucide-react";
 import { getTeamMatchHistory, MatchHistoryItem } from "../utils/teamOpponents";
 
@@ -48,16 +49,18 @@ export function StatsHubGraphsView({ match }: StatsHubGraphsViewProps) {
 
   const teamName = selectedTeam === "home" ? match.homeTeam : match.awayTeam;
 
+  const isNational = isNationalTeamContext(match.homeTeam, match.league) || isNationalTeamContext(match.awayTeam, match.league);
+
   const [realHomeHistory, setRealHomeHistory] = useState<RealTeamHistoricalMatch[] | null>(
-    isAuthenticHistory(match.homeTeamHistory) ? match.homeTeamHistory! : null
+    isAuthenticHistory(match.homeTeamHistory, isNational) ? match.homeTeamHistory! : null
   );
   const [realAwayHistory, setRealAwayHistory] = useState<RealTeamHistoricalMatch[] | null>(
-    isAuthenticHistory(match.awayTeamHistory) ? match.awayTeamHistory! : null
+    isAuthenticHistory(match.awayTeamHistory, isNational) ? match.awayTeamHistory! : null
   );
 
   useEffect(() => {
-    const homeOk = isAuthenticHistory(match.homeTeamHistory);
-    const awayOk = isAuthenticHistory(match.awayTeamHistory);
+    const homeOk = isAuthenticHistory(match.homeTeamHistory, isNational);
+    const awayOk = isAuthenticHistory(match.awayTeamHistory, isNational);
 
     if (homeOk && awayOk) {
       setRealHomeHistory(match.homeTeamHistory!);
@@ -69,11 +72,11 @@ export function StatsHubGraphsView({ match }: StatsHubGraphsViewProps) {
     const eid = match.id.startsWith("sh-") ? match.id.replace("sh-", "") : match.id;
 
     const fetchHome = !homeOk && (match.homeTeamId || match.homeTeam)
-      ? fetch(`/api/statshub/team-history?teamId=${match.homeTeamId || ''}&teamName=${encodeURIComponent(match.homeTeam)}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
+      ? fetch(`/api/statshub/team-history?teamId=${match.homeTeamId || ''}&teamName=${encodeURIComponent(match.homeTeam)}&league=${encodeURIComponent(match.league || '')}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
       : Promise.resolve(homeOk ? { success: true, history: match.homeTeamHistory } : { success: false });
     
     const fetchAway = !awayOk && (match.awayTeamId || match.awayTeam)
-      ? fetch(`/api/statshub/team-history?teamId=${match.awayTeamId || ''}&teamName=${encodeURIComponent(match.awayTeam)}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
+      ? fetch(`/api/statshub/team-history?teamId=${match.awayTeamId || ''}&teamName=${encodeURIComponent(match.awayTeam)}&league=${encodeURIComponent(match.league || '')}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
       : Promise.resolve(awayOk ? { success: true, history: match.awayTeamHistory } : { success: false });
 
     Promise.all([fetchHome, fetchAway]).then(([resH, resA]) => {
@@ -89,7 +92,7 @@ export function StatsHubGraphsView({ match }: StatsHubGraphsViewProps) {
     }).catch(() => {});
 
     return () => { isMounted = false; };
-  }, [match.id, match.homeTeam, match.awayTeam, match.homeTeamId, match.awayTeamId, match.homeTeamHistory, match.awayTeamHistory, match.startTimestamp]);
+  }, [match.id, match.homeTeam, match.awayTeam, match.homeTeamId, match.awayTeamId, match.homeTeamHistory, match.awayTeamHistory, match.startTimestamp, match.league, isNational]);
 
   const activeRealHistory = selectedTeam === "home" ? realHomeHistory : realAwayHistory;
 

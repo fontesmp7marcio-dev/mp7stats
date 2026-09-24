@@ -120,8 +120,15 @@ export interface PlayerTrend {
   };
 }
 
+export const EUROPEAN_CLUBS_LIST = [
+  "Ajax", "PSV", "Feyenoord", "Celtic", "Rangers", "Benfica", "Porto", "Sporting CP",
+  "Galatasaray", "Fenerbahçe", "Olympiacos", "Red Bull Salzburg", "Slavia Praha",
+  "Dinamo Zagreb", "Lyon", "Marseille", "Monaco", "Lille"
+];
+
 export interface RealTeamHistoricalMatch {
   eventId: number;
+  isSynthetic?: boolean;
   dateStr: string;
   timestamp: number;
   opponent: string;
@@ -139,16 +146,20 @@ export interface RealTeamHistoricalMatch {
   };
 }
 
-export function isAuthenticHistory(history?: RealTeamHistoricalMatch[] | null): boolean {
+export function isAuthenticHistory(history?: RealTeamHistoricalMatch[] | null, isNational = false): boolean {
   if (!history || !Array.isArray(history) || history.length === 0) return false;
   return history.every(m => 
     m &&
+    !m.isSynthetic &&
+    m.eventId !== 980000 &&
+    !(m.eventId >= 980000 && m.eventId <= 980100) &&
     m.opponent && 
     !m.opponent.startsWith("Adversário") && 
     !m.opponent.startsWith("Mandante") && 
     !m.opponent.startsWith("Visitante") && 
     !m.opponent.startsWith("Rival FC") &&
-    !m.dateStr.startsWith("Jogo")
+    !m.dateStr.startsWith("Jogo") &&
+    (!isNational || !EUROPEAN_CLUBS_LIST.includes(m.opponent))
   );
 }
 

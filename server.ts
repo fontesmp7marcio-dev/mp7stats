@@ -7,7 +7,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import { generateMatchesForDate, extractRealHistoricalMatches, ensureTenHistoricalMatches } from "./src/data";
+import { generateMatchesForDate, extractRealHistoricalMatches, ensureTenHistoricalMatches, isNationalTeamContext } from "./src/data";
 import { KNOWN_TEAM_IDS } from "./src/utils/teamLogos";
 import { 
   fetchStatsHubCalendar, 
@@ -196,7 +196,8 @@ async function startServer() {
       return res.status(400).json({ success: false, error: "teamId ou teamName é obrigatório" });
     }
 
-    const effectiveLeague = leagueName || (teamName && ["criciúma", "criciuma", "sport", "vila nova", "operário", "operario", "coritiba", "chapecoense", "botafogo-sp"].some(t => teamName.toLowerCase().includes(t)) ? "Brasileirão Série B" : "Brasileirão Série A");
+    const isNational = isNationalTeamContext(teamName || "", leagueName);
+    const effectiveLeague = leagueName || (isNational ? "Qualificação Continental" : (teamName && ["criciúma", "criciuma", "sport", "vila nova", "operário", "operario", "coritiba", "chapecoense", "botafogo-sp"].some(t => teamName.toLowerCase().includes(t)) ? "Brasileirão Série B" : "Brasileirão Série A"));
 
     try {
       let rawHistory: any[] = [];

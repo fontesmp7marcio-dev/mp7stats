@@ -5,6 +5,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { MatchData, MarketType, MarketBacktest, RealTeamHistoricalMatch, isAuthenticHistory } from "../types";
+import { isNationalTeamContext } from "../data";
 import { TeamEmblem } from "./TeamEmblem";
 import { getTeamMatchHistory, MatchHistoryItem } from "../utils/teamOpponents";
 import { 
@@ -53,26 +54,28 @@ export function StatsHubMarketAnalyzerView({ match }: StatsHubMarketAnalyzerView
   const [isMarketDropdownOpen, setIsMarketDropdownOpen] = useState(false);
   const [marketSearchQuery, setMarketSearchQuery] = useState("");
 
+  const isNational = isNationalTeamContext(match.homeTeam, match.league) || isNationalTeamContext(match.awayTeam, match.league);
+
   // Histórico real puxado do StatsHUB via props ou API
   const [realHomeHistory, setRealHomeHistory] = useState<RealTeamHistoricalMatch[] | null>(
-    isAuthenticHistory(match.homeTeamHistory) ? match.homeTeamHistory! : null
+    isAuthenticHistory(match.homeTeamHistory, isNational) ? match.homeTeamHistory! : null
   );
   const [realAwayHistory, setRealAwayHistory] = useState<RealTeamHistoricalMatch[] | null>(
-    isAuthenticHistory(match.awayTeamHistory) ? match.awayTeamHistory! : null
+    isAuthenticHistory(match.awayTeamHistory, isNational) ? match.awayTeamHistory! : null
   );
 
   useEffect(() => {
-    if (isAuthenticHistory(match.homeTeamHistory)) {
+    if (isAuthenticHistory(match.homeTeamHistory, isNational)) {
       setRealHomeHistory(match.homeTeamHistory!);
     }
-    if (isAuthenticHistory(match.awayTeamHistory)) {
+    if (isAuthenticHistory(match.awayTeamHistory, isNational)) {
       setRealAwayHistory(match.awayTeamHistory!);
     }
-  }, [match.id, match.homeTeamHistory, match.awayTeamHistory]);
+  }, [match.id, match.homeTeamHistory, match.awayTeamHistory, isNational]);
 
   useEffect(() => {
-    const homeOk = isAuthenticHistory(realHomeHistory);
-    const awayOk = isAuthenticHistory(realAwayHistory);
+    const homeOk = isAuthenticHistory(realHomeHistory, isNational);
+    const awayOk = isAuthenticHistory(realAwayHistory, isNational);
 
     // Verificar se já temos histórico com períodos completos para o mercado selecionado
     const hasHomeMarketPeriod = realHomeHistory?.some(m => m.periodStats?.firstHalf && m.periodStats.firstHalf[selectedMarketKey] !== undefined);
@@ -89,11 +92,11 @@ export function StatsHubMarketAnalyzerView({ match }: StatsHubMarketAnalyzerView
     const eid = match.id.startsWith("sh-") ? match.id.replace("sh-", "") : match.id;
 
     const fetchHome = (!homeOk || !hasHomeMarketPeriod) && (match.homeTeamId || match.homeTeam)
-      ? fetch(`/api/statshub/team-history?teamId=${match.homeTeamId || ''}&teamName=${encodeURIComponent(match.homeTeam)}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
+      ? fetch(`/api/statshub/team-history?teamId=${match.homeTeamId || ''}&teamName=${encodeURIComponent(match.homeTeam)}&league=${encodeURIComponent(match.league || '')}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
       : Promise.resolve(homeOk ? { success: true, history: realHomeHistory } : { success: false });
     
     const fetchAway = (!awayOk || !hasAwayMarketPeriod) && (match.awayTeamId || match.awayTeam)
-      ? fetch(`/api/statshub/team-history?teamId=${match.awayTeamId || ''}&teamName=${encodeURIComponent(match.awayTeam)}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
+      ? fetch(`/api/statshub/team-history?teamId=${match.awayTeamId || ''}&teamName=${encodeURIComponent(match.awayTeam)}&league=${encodeURIComponent(match.league || '')}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
       : Promise.resolve(awayOk ? { success: true, history: realAwayHistory } : { success: false });
 
     Promise.all([fetchHome, fetchAway]).then(([resH, resA]) => {
@@ -109,7 +112,7 @@ export function StatsHubMarketAnalyzerView({ match }: StatsHubMarketAnalyzerView
     }).catch(() => {});
 
     return () => { isMounted = false; };
-  }, [match.id, match.homeTeam, match.awayTeam, match.homeTeamId, match.awayTeamId, match.startTimestamp, selectedPeriod, selectedMarketKey]);
+  }, [match.id, match.homeTeam, match.awayTeam, match.homeTeamId, match.awayTeamId, match.startTimestamp, match.league, selectedPeriod, selectedMarketKey, isNational]);
 
   // Dados do mercado selecionado
   const currentMarketData: MarketBacktest | undefined = match.markets[selectedMarketKey] || Object.values(match.markets)[0];

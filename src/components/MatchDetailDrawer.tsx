@@ -6,7 +6,7 @@
 import { MatchData, MarketType, RealTeamHistoricalMatch, isAuthenticHistory } from "../types";
 import { X, Sparkles, Star, Award, ShieldCheck, ExternalLink, CheckCircle2, RefreshCw, Clock } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { computeFourthEntryRecommendation, computeTopFourDistinctOpportunities } from "../data";
+import { computeFourthEntryRecommendation, computeTopFourDistinctOpportunities, isNationalTeamContext } from "../data";
 import { 
   TrendChartIcon, 
   PlayerUserIcon, 
@@ -33,11 +33,13 @@ export default function MatchDetailDrawer({ match, onClose, geminiActive }: Matc
   const [auditLoading, setAuditLoading] = useState<boolean>(false);
   const [auditResult, setAuditResult] = useState<string | null>(null);
 
+  const isNational = match ? (isNationalTeamContext(match.homeTeam, match.league) || isNationalTeamContext(match.awayTeam, match.league)) : false;
+
   const [realHomeHistory, setRealHomeHistory] = useState<RealTeamHistoricalMatch[] | null>(
-    match && isAuthenticHistory(match.homeTeamHistory) ? match.homeTeamHistory! : null
+    match && isAuthenticHistory(match.homeTeamHistory, isNational) ? match.homeTeamHistory! : null
   );
   const [realAwayHistory, setRealAwayHistory] = useState<RealTeamHistoricalMatch[] | null>(
-    match && isAuthenticHistory(match.awayTeamHistory) ? match.awayTeamHistory! : null
+    match && isAuthenticHistory(match.awayTeamHistory, isNational) ? match.awayTeamHistory! : null
   );
 
   useEffect(() => {
@@ -47,8 +49,8 @@ export default function MatchDetailDrawer({ match, onClose, geminiActive }: Matc
       return;
     }
 
-    const homeOk = isAuthenticHistory(match.homeTeamHistory);
-    const awayOk = isAuthenticHistory(match.awayTeamHistory);
+    const homeOk = isAuthenticHistory(match.homeTeamHistory, isNational);
+    const awayOk = isAuthenticHistory(match.awayTeamHistory, isNational);
 
     setRealHomeHistory(homeOk ? match.homeTeamHistory! : null);
     setRealAwayHistory(awayOk ? match.awayTeamHistory! : null);
@@ -68,11 +70,11 @@ export default function MatchDetailDrawer({ match, onClose, geminiActive }: Matc
     const eid = match.id.startsWith("sh-") ? match.id.replace("sh-", "") : match.id;
 
     const fetchHome = !homeOk && (match.homeTeamId || match.homeTeam)
-      ? fetch(`/api/statshub/team-history?teamId=${match.homeTeamId || ''}&teamName=${encodeURIComponent(match.homeTeam)}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
+      ? fetch(`/api/statshub/team-history?teamId=${match.homeTeamId || ''}&teamName=${encodeURIComponent(match.homeTeam)}&league=${encodeURIComponent(match.league || '')}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
       : Promise.resolve(homeOk ? { success: true, history: match.homeTeamHistory } : { success: false });
     
     const fetchAway = !awayOk && (match.awayTeamId || match.awayTeam)
-      ? fetch(`/api/statshub/team-history?teamId=${match.awayTeamId || ''}&teamName=${encodeURIComponent(match.awayTeam)}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
+      ? fetch(`/api/statshub/team-history?teamId=${match.awayTeamId || ''}&teamName=${encodeURIComponent(match.awayTeam)}&league=${encodeURIComponent(match.league || '')}&currentEventId=${eid}&currentTimestamp=${match.startTimestamp || ''}`).then(r => r.json())
       : Promise.resolve(awayOk ? { success: true, history: match.awayTeamHistory } : { success: false });
 
     Promise.all([fetchHome, fetchAway]).then(([resH, resA]) => {
@@ -88,7 +90,7 @@ export default function MatchDetailDrawer({ match, onClose, geminiActive }: Matc
     }).catch(() => {});
 
     return () => { isMounted = false; };
-  }, [match?.id, match?.homeTeam, match?.awayTeam, match?.homeTeamId, match?.awayTeamId, match?.homeTeamHistory, match?.awayTeamHistory]);
+  }, [match?.id, match?.homeTeam, match?.awayTeam, match?.homeTeamId, match?.awayTeamId, match?.homeTeamHistory, match?.awayTeamHistory, match?.league, isNational]);
 
   const propsToRender = useMemo(() => {
     if (!match) return [];

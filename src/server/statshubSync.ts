@@ -626,21 +626,29 @@ export async function fetchStatsHubMatches(dateStr: string): Promise<MatchData[]
         }
 
 
-          // PRE-FETCH RÁPIDO APENAS PARA O TOPO DAS COMPETIÇÕES POPULARES (TIMEOUT RÍGIDO DE 400MS)
-          const popMatches = flattenedRaw.filter(r => (r.uniqueViewPriority ?? -1) >= 0);
-          const topTeamIds: number[] = [];
-          for (const raw of popMatches.slice(0, 8)) {
+          // PRE-FETCH DE HISTÓRICO REAL PARA TODOS OS CONFRONTOS DO DIA (SELEÇÕES E CLUBES)
+          const allTeamIds: number[] = [];
+          for (const raw of flattenedRaw) {
             const hid = raw.homeTeam?.id;
             const aid = raw.awayTeam?.id;
-            if (hid && !teamPerfCache.has(hid) && !topTeamIds.includes(hid)) topTeamIds.push(hid);
-            if (aid && !teamPerfCache.has(aid) && !topTeamIds.includes(aid)) topTeamIds.push(aid);
+            if (hid && !teamPerfCache.has(hid) && !allTeamIds.includes(hid)) allTeamIds.push(hid);
+            if (aid && !teamPerfCache.has(aid) && !allTeamIds.includes(aid)) allTeamIds.push(aid);
           }
 
-          if (topTeamIds.length > 0) {
+          if (allTeamIds.length > 0) {
             try {
+              // Buscar em lotes de 8 com timeout de 3500ms para carregar o histórico oficial de seleções e clubes
+              const chunks: number[][] = [];
+              for (let i = 0; i < allTeamIds.length; i += 8) {
+                chunks.push(allTeamIds.slice(i, i + 8));
+              }
               await Promise.race([
-                Promise.all(topTeamIds.map(id => fetchTeamPerformanceSafe(id))),
-                new Promise(r => setTimeout(r, 400))
+                (async () => {
+                  for (const chunk of chunks) {
+                    await Promise.all(chunk.map(id => fetchTeamPerformanceSafe(id)));
+                  }
+                })(),
+                new Promise(r => setTimeout(r, 3500))
               ]);
             } catch {}
           }

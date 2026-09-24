@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MarketType, MatchData, MarketBacktest, TeamBacktestData, Proposition, RealTeamHistoricalMatch, isAuthenticHistory } from "./types";
+import { MarketType, MatchData, MarketBacktest, TeamBacktestData, Proposition, RealTeamHistoricalMatch, isAuthenticHistory, EUROPEAN_CLUBS_LIST } from "./types";
 import { auditMatchProposition } from "./audit";
 import { resolveTeamLogoUrl, KNOWN_TEAM_IDS } from "./utils/teamLogos";
 import { isMaleSeniorMatch } from "./utils/matchFilter";
@@ -1359,6 +1359,104 @@ export function extractRealHistoricalMatches(
 }
 
 /**
+ * Pools de seleções nacionais divididas por confederações/regiões
+ */
+export const NATIONAL_POOLS: Record<string, string[]> = {
+  europe: [
+    "Lithuania", "Liechtenstein", "Netherlands", "Germany", "Serbia", "Greece", 
+    "Portugal", "Wales", "Norway", "Denmark", "North Macedonia", "Slovenia", 
+    "Austria", "Israel", "Kosovo", "Ireland", "Andorra", "Malta", "France", 
+    "Spain", "Italy", "England", "Belgium", "Croatia", "Switzerland", "Poland", 
+    "Sweden", "Ukraine", "Czech Republic", "Scotland", "Hungary", "Romania", 
+    "Slovakia", "Turkey", "Albania", "Georgia", "Luxembourg", "Cyprus", "Moldova", 
+    "Finland", "Montenegro", "Kazakhstan", "Armenia", "Azerbaijan", "Iceland", 
+    "Northern Ireland", "Bosnia and Herzegovina", "Estonia", "Latvia", "Faroe Islands", "San Marino", "Gibraltar"
+  ],
+  africa: [
+    "Cameroon", "Comoros", "Namibia", "Congo Republic", "Mauritania", "Central African Republic", 
+    "Tunisia", "Uganda", "Libya", "Botswana", "Côte d'Ivoire", "Ghana", "Sierra Leone", 
+    "Zimbabwe", "DR Congo", "Equatorial Guinea", "Senegal", "Morocco", "Egypt", "Nigeria", 
+    "Algeria", "South Africa", "Mali", "Burkina Faso", "Guinea", "Zambia", "Angola", 
+    "Gabon", "Mozambique", "Madagascar", "Benin", "Kenya", "Tanzania", "Togo", "Sudan", 
+    "Rwanda", "Burundi", "Gambia", "Niger", "Liberia", "Eswatini", "Lesotho", "Malawi"
+  ],
+  concacaf: [
+    "Costa Rica", "Curaçao", "Dominican Republic", "Nicaragua", "Haiti", "Trinidad and Tobago", 
+    "Puerto Rico", "Guyana", "Cayman Islands", "Dominica", "USA", "Mexico", "Canada", 
+    "Panama", "Jamaica", "Honduras", "El Salvador", "Guatemala", "Cuba", "Suriname", 
+    "Martinique", "Guadeloupe", "Belize", "Barbados", "Saint Lucia", "Bermuda", "Aruba"
+  ],
+  asia: [
+    "Qatar", "Bahrain", "United Arab Emirates", "Yemen", "Japan", "South Korea", 
+    "Palestine", "New Zealand", "China", "Maldives", "Uzbekistan", "Iran", 
+    "Solomon Islands", "Vanuatu", "Saudi Arabia", "Australia", "Iraq", "Jordan", 
+    "Oman", "Kuwait", "Syria", "Lebanon", "Vietnam", "Thailand", "Indonesia", 
+    "Malaysia", "India", "Tajikistan", "Kyrgyzstan", "Hong Kong", "Singapore"
+  ],
+  south_america: [
+    "Brazil", "Argentina", "Uruguay", "Colombia", "Chile", "Ecuador", "Peru", 
+    "Paraguay", "Venezuela", "Bolivia"
+  ],
+  world: [
+    "France", "Germany", "Argentina", "Brazil", "England", "Spain", "Portugal", 
+    "Netherlands", "Italy", "Uruguay", "Croatia", "Morocco", "Japan", "USA", 
+    "Mexico", "Senegal", "Switzerland", "Denmark", "Colombia", "South Korea"
+  ]
+};
+
+/**
+ * Identifica se uma equipe ou confronto pertence ao contexto de seleções nacionais
+ */
+export function isNationalTeamContext(teamName = "", league = ""): boolean {
+  const t = (teamName || "").toLowerCase().trim();
+  const l = (league || "").toLowerCase().trim();
+
+  // Competições de seleções conhecidas
+  const nationalLeagueKeywords = [
+    "nations league", "liga das nações", "liga das nacoes",
+    "africa cup", "copa africana", "afcon",
+    "copa américa", "copa america",
+    "euro", "eurocopa", "u21 euro", "sub-21",
+    "world cup", "copa do mundo", "mundial",
+    "eliminatórias", "eliminatorias", "qualif",
+    "amistoso", "friendly", "amigáveis", "amigaveis", "fifa",
+    "concacaf", "gulf cup", "copa do golfo", "asian cup", "copa da ásia", "copa da asia",
+    "internacional", "international", "seleç", "selec"
+  ];
+  if (nationalLeagueKeywords.some(k => l.includes(k))) return true;
+
+  // Seleções conhecidas em qualquer confederação
+  const allNations = Object.values(NATIONAL_POOLS).flat();
+  const normalizedT = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (allNations.some(n => {
+    const normN = n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return normalizedT === normN || normalizedT.includes(normN) || normN.includes(normalizedT);
+  })) {
+    return true;
+  }
+
+  // Nomes em português de seleções
+  const ptNations = [
+    "lituânia", "lituania", "liechtenstein", "camarões", "camaroes", "comores", "namíbia", "namibia", "nubia",
+    "congo", "república do congo", "republica do congo", "rd congo", "república centro-africana", "republica centro-africana",
+    "mauritânia", "mauritania", "tunísia", "tunisia", "uganda", "líbia", "libia", "botsuana", "botswana",
+    "costa do marfim", "gana", "serra leoa", "zimbábue", "zimbabue", "guiné equatorial", "guine equatorial",
+    "holanda", "países baixos", "paises baixos", "alemanha", "sérvia", "servia", "grécia", "grecia",
+    "portugal", "país de gales", "pais de gales", "gales", "noruega", "dinamarca", "macedônia do norte", "macedonia do norte",
+    "eslovênia", "eslovenia", "áustria", "austria", "israel", "irlanda", "espanha", "frança", "franca",
+    "itália", "italia", "inglaterra", "bélgica", "belgica", "croácia", "croacia", "suíça", "suica", "polônia", "polonia",
+    "suécia", "suecia", "ucrânia", "ucrania", "república tcheca", "republica tcheca", "escócia", "escocia", "hungria", "romênia", "romenia",
+    "eslováquia", "eslovaquia", "turquia", "geórgia", "georgia", "bósnia", "bosnia", "finlândia", "finlandia",
+    "japão", "japao", "uruguai", "coreia do sul", "nova zelândia", "nova zelandia", "marrocos", "egito", "senegal",
+    "estados unidos", "méxico", "mexico", "colômbia", "colombia", "paraguai", "catar", "qatar", "barein", "bahrein",
+    "emirados árabes", "emirados arabes", "iêmen", "iemen", "uzbequistão", "uzbequistao", "irão", "irao", "ira"
+  ];
+  if (ptNations.some(p => normalizedT.includes(p) || p.includes(normalizedT))) return true;
+
+  return false;
+}
+
+/**
  * Pools de clubes e competições para auditoria dos 10 últimos jogos de qualquer clube
  */
 const CLUB_POOLS: Record<string, string[]> = {
@@ -1396,8 +1494,30 @@ const CLUB_POOLS: Record<string, string[]> = {
   ]
 };
 
-function getLeagueOpponentPool(league: string): string[] {
+export function getLeagueOpponentPool(league: string, teamName?: string): string[] {
   const l = (league || "").toLowerCase();
+  const t = (teamName || "").toLowerCase();
+
+  // Se for contexto de seleções, NUNCA retornar clubes europeus
+  if (isNationalTeamContext(teamName || "", league)) {
+    if (l.includes("africa") || l.includes("afcon") || l.includes("copa africana") || NATIONAL_POOLS.africa.some(n => t.includes(n.toLowerCase()))) {
+      return NATIONAL_POOLS.africa;
+    }
+    if (l.includes("concacaf") || NATIONAL_POOLS.concacaf.some(n => t.includes(n.toLowerCase()))) {
+      return NATIONAL_POOLS.concacaf;
+    }
+    if (l.includes("asia") || l.includes("asian") || l.includes("gulf") || NATIONAL_POOLS.asia.some(n => t.includes(n.toLowerCase()))) {
+      return NATIONAL_POOLS.asia;
+    }
+    if (l.includes("américa") || l.includes("america") || l.includes("conmebol") || NATIONAL_POOLS.south_america.some(n => t.includes(n.toLowerCase()))) {
+      return NATIONAL_POOLS.south_america;
+    }
+    if (l.includes("nations league") || l.includes("euro") || NATIONAL_POOLS.europe.some(n => t.includes(n.toLowerCase()))) {
+      return NATIONAL_POOLS.europe;
+    }
+    return NATIONAL_POOLS.europe;
+  }
+
   if (l.includes("premier") || l.includes("inglaterra") || l.includes("efl")) return CLUB_POOLS.premier;
   if (l.includes("la liga") || l.includes("espanha")) return CLUB_POOLS.laliga;
   if (l.includes("série b") || l.includes("serie b")) return CLUB_POOLS.brasil_serieb;
@@ -1407,7 +1527,23 @@ function getLeagueOpponentPool(league: string): string[] {
   return CLUB_POOLS.europe;
 }
 
-function getCompetitionForIndex(league: string, index: number): string {
+export function getCompetitionForIndex(league: string, index: number, isNational = false): string {
+  if (isNational || isNationalTeamContext("", league)) {
+    const comps = [
+      league || "Qualificação Continental",
+      league || "Qualificação Continental",
+      "Amistoso Internacional",
+      league || "Qualificação Continental",
+      "Eliminatórias da Copa do Mundo",
+      league || "Qualificação Continental",
+      "Competição Continental",
+      league || "Qualificação Continental",
+      "Amistoso Internacional",
+      league || "Qualificação Continental"
+    ];
+    return comps[index % comps.length];
+  }
+
   const l = (league || "").toLowerCase();
   if (l.includes("premier") || l.includes("inglaterra") || l.includes("efl")) {
     const comps = [league, league, "FA Cup", league, "UEFA Champions League", league, "EFL Cup", league, "Amistoso Interclubes", league];
@@ -1478,11 +1614,12 @@ export function generateSyntheticTeamMatches(
   const matches: RealTeamHistoricalMatch[] = [];
   const teamStrength = getTeamStrengthMultiplier(teamName);
   const profile = getTeamTacticalProfile(teamName);
-  const pool = getLeagueOpponentPool(league).filter(opp => opp.toLowerCase() !== teamName.toLowerCase());
+  const isNational = isNationalTeamContext(teamName, league);
+  const pool = getLeagueOpponentPool(league, teamName).filter(opp => opp.toLowerCase() !== teamName.toLowerCase());
 
   for (let i = 0; i < 10; i++) {
     const isHome = isHomeTeam ? (i % 2 === 0) : (i % 2 !== 0);
-    const oppName = pool[(i + Math.abs(teamName.length * 3)) % pool.length] || "Clube Competidor";
+    const oppName = pool[(i + Math.abs(teamName.length * 3)) % pool.length] || (isNational ? "Seleção Competidora" : "Clube Competidor");
     
     const stats: Record<string, number> = {};
     const firstHalf: Partial<Record<string, number>> = {};
@@ -1525,10 +1662,11 @@ export function generateSyntheticTeamMatches(
 
     matches.push({
       eventId: 980000 + i,
+      isSynthetic: true,
       dateStr: REAL_DATE_SAMPLES[i] || "10/09/2026",
       timestamp: Date.now() - (i + 1) * 86400000 * 3,
       opponent: oppName,
-      competition: getCompetitionForIndex(league, i),
+      competition: getCompetitionForIndex(league, i, isNational),
       isHome,
       score: `${goalsHome} - ${goalsAway}`,
       stats,
@@ -1545,7 +1683,7 @@ export function generateSyntheticTeamMatches(
 }
 
 /**
- * Garante obrigatoriamente que qualquer clube possua as informações referentes
+ * Garante obrigatoriamente que qualquer clube ou seleção possua as informações referentes
  * às últimas 10 partidas, cobrindo FT, 1T e 2T, independentemente de liga ou competição.
  */
 export function ensureTenHistoricalMatches(
@@ -1556,11 +1694,13 @@ export function ensureTenHistoricalMatches(
   rand?: () => number
 ): RealTeamHistoricalMatch[] {
   const r = rand || Math.random;
+  const isNational = isNationalTeamContext(teamName, league);
   const validExisting = (existingMatches || []).filter(m => 
     m && m.opponent && 
     !m.opponent.startsWith("Adversário") && 
     !m.opponent.startsWith("Mandante") && 
-    !m.opponent.startsWith("Visitante")
+    !m.opponent.startsWith("Visitante") &&
+    (!isNational || !EUROPEAN_CLUBS_LIST.includes(m.opponent))
   );
 
   if (validExisting.length >= 10) {
@@ -1570,13 +1710,15 @@ export function ensureTenHistoricalMatches(
   const result: RealTeamHistoricalMatch[] = [...validExisting];
   const needed = 10 - result.length;
 
-  // Localizar dados de alta precisão conhecidos (ex: Criciúma, Sport Recife, etc.)
+  // Localizar dados de alta precisão conhecidos (ex: Criciúma, Sport Recife, etc.) - apenas para clubes
   const normalized = teamName.toLowerCase().replace(/[^a-z0-9]/g, "");
   let knownOpps: any[] | null = null;
-  for (const [key, opps] of Object.entries(KNOWN_TEAM_OPPONENTS)) {
-    if (normalized.includes(key) || key.includes(normalized)) {
-      knownOpps = opps;
-      break;
+  if (!isNational) {
+    for (const [key, opps] of Object.entries(KNOWN_TEAM_OPPONENTS)) {
+      if (normalized.includes(key) || key.includes(normalized)) {
+        knownOpps = opps;
+        break;
+      }
     }
   }
 
